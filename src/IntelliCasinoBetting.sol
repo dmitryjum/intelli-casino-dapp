@@ -11,7 +11,14 @@ contract IntelliCasinoBetting is ATM, Ownable {
         Team teamBet
     );
 
+    struct Game {
+      string description;
+      bool isOpen;
+      Bet[] bets;
+    }
+
     struct Bet {
+        uint256 gameId;
         string name;
         address addy;
         uint amount;
@@ -72,6 +79,14 @@ contract IntelliCasinoBetting is ATM, Ownable {
 
         emit NewBet(msg.sender, msg.value, teams[_teamId]);
 
+    }
+
+    function closeGame(uint256 _gameId) public payable onlyOwner() {
+      
+    }
+
+    function removeBet(uint256 _gameId) public {
+      
     }
 
     function teamWinDistribution(uint _teamId) public payable onlyOwner() {
