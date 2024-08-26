@@ -111,10 +111,10 @@ contract IntelliCasinoBetting is Ownable {
         uint256 payoutRatio = 0;
         if (playerWon) {
             payoutRatio = (game.casinoBetsTotal * 10000) / game.playerBetsTotal;
-            distributeToWinners(game, true, payoutRatio, totalWinnings);
+            distributeToWinners(game, true, payoutRatio);
         } else {
             payoutRatio = (game.playerBetsTotal * 10000) / game.casinoBetsTotal;
-            distributeToWinners(game, false, payoutRatio, totalWinnings);
+            distributeToWinners(game, false, payoutRatio);
         }
 
         payable(owner()).transfer(commission);
@@ -122,7 +122,7 @@ contract IntelliCasinoBetting is Ownable {
         emit WinningsDistributed(_gameId, totalWinnings);
     }
 
-    function distributeToWinners(Game storage game, bool playerWon, uint256 payoutRatio, uint256 totalWinnings) internal {
+    function distributeToWinners(Game storage game, bool playerWon, uint256 payoutRatio) internal {
         for (uint i = 0; i < game.bets[msg.sender].length; i++) {
             Bet storage bet = game.bets[msg.sender][i];
             if ((playerWon && bet.bettingOnPlayer) || (!playerWon && !bet.bettingOnPlayer)) {
