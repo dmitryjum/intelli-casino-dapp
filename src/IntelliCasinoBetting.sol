@@ -21,7 +21,7 @@ contract IntelliCasinoBetting is Ownable {
         uint256 playerBetsTotal;
         uint256 casinoBetsTotal;
         uint256 totalBetPool;
-        mapping(uint256 => Bet) bets; // mapping of user address to their bets
+        mapping(uint256 => Bet) bets; // mapping of betters array indxes to their bets
         address[] betters;
     }
     
@@ -60,12 +60,13 @@ contract IntelliCasinoBetting is Ownable {
 
         Game storage game = games[_gameId];
         uint256 betIndex = findBetIndex(game.betters, msg.sender);
+        Bet memory bet;
         if (betIndex > 0) {
-            Bet memory existingBet = game.bets[betIndex]
+            bet = game.bets[betIndex]
             require(bet.user == msg.sender, "This isn't your bet");
-            existingBet.amount += msg.value
+            bet.amount += msg.value
         } else {
-            Bet memory newBet = Bet({
+            bet = Bet({
                 user: msg.sender,
                 amount: msg.value,
                 bettingOnPlayer: bettingOnPlayer,
@@ -73,7 +74,7 @@ contract IntelliCasinoBetting is Ownable {
             });
 
             game.betters.push(msg.sender);
-            game.bets[game.betters.length - 1] = newBet
+            game.bets[game.betters.length - 1] = bet
         }
 
         if (bettingOnPlayer) {
@@ -95,15 +96,15 @@ contract IntelliCasinoBetting is Ownable {
         require(betIndex >= 0, "You don't have bets on this game");
         Bet storage bet = game.bets[betIndex];
         require(bet.state == BetState.PENDING, "Bet is not pending or already withdrawn");
-
+        uint256 betAmount = bet.amount
         if (bet.bettingOnPlayer) {
-            game.playerBetsTotal -= bet.amount;
+            game.playerBetsTotal -= betAmount;
         } else {
-            game.casinoBetsTotal -= bet.amount;
+            game.casinoBetsTotal -= betAmount;
         }
 
-        game.totalBetPool -= bet.amount;
-        payable(msg.sender).transfer(bet.amount);
+        game.totalBetPool -= betAmount;
+        payable(msg.sender).transfer(betAmount);
 
         uint256 lastIndex = game.betters.length - 1;
         game.betters[betIndex] = game.betters[lastIndex]; // replace the old betters address with the last one in the array
@@ -111,7 +112,7 @@ contract IntelliCasinoBetting is Ownable {
         game.betters.pop() // delete the last betters address
         delete game.bets[lastIndex] // delete the duplicate k/v address/Bet pair
 
-        emit BetWithdrawn(_gameId, msg.sender, betIndex); // pass actual game.id
+        emit BetWithdrawn(_gameId, msg.sender, betAmount);
     }
 
     function closeGame(uint256 _gameId) public onlyOwner {
@@ -119,7 +120,7 @@ contract IntelliCasinoBetting is Ownable {
         require(game.state == GameState.OPEN, "Game is already closed or finished");
         game.state = GameState.CLOSED;
 
-        emit GameClosed(_gameId); // pass actual game.id
+        emit GameClosed(_gameId);
     }
 
     function distributeWinnings(uint256 _gameId, bool playerWon) public onlyOwner {
@@ -129,32 +130,36 @@ contract IntelliCasinoBetting is Ownable {
 
         uint256 commission = (game.totalBetPool * 3) / 100; // 3% commission
         uint256 totalWinnings = game.totalBetPool - commission;
+        uint256 casinoBetsTotalMinusComission = (game.casinoBetsTotal * 3) / 100;
+        uint256 playerBetsTotalMinusComission = (game.playerBetsTotal * 3) / 100;
         // formula( bet + (bet / totalBetsOnYourTeam * total bet on the other team)
         uint256 payoutRatio = 0;
         if (playerWon) {
-            payoutRatio = (game.casinoBetsTotal * 10000) / game.playerBetsTotal; // the logic is correct
-            distributeToWinners(game, true, payoutRatio);
+            payoutRatio = (casinoBetsTotalMinusComission * 10000) / playerBetsTotalMinusComission; // the logic is correct
+            distributeToWinners(game, true, payoutRatio, totalWinnings);
         } else {
-            payoutRatio = (game.playerBetsTotal * 10000) / game.casinoBetsTotal;
-            distributeToWinners(game, false, payoutRatio);
+            payoutRatio = (playerBetsTotalMinusComission * 10000) / casinoBetsTotalMinusComission;
+            distributeToWinners(game, false, payoutRatio, totalWinnings);
         }
 
         // Transfer the commission to the owner of the contract
         payable(owner()).transfer(commission);
-
-        emit WinningsDistributed(_gameId, totalWinnings);
     }
 
-    function distributeToWinners(Game storage game, bool playerWon, uint256 payoutRatio) internal {
+    function distributeToWinners(Game storage game, bool playerWon, uint256 payoutRatio, uint256 totalWinnings) internal {
+        uint256 totalWinners = 0
         for (uint256 i = 0; i < game.betters.length; i++) {
             Bet storage bet = game.bets[i];
             if (playerWon == bet.bettingOnPlayer) {
                 uint256 winnings = (bet.amount * (10000 + payoutRatio)) / 10000;
                 payable(bet.user).transfer(winnings);
                 bet.state = BetState.WON;
+                totalWinners++;
             } else {
                 bet.state = BetState.LOST;
             }
         }
+
+        emit WinningsDistributed(_gameId, totalWinnings, totalWinners);
     }
 }
