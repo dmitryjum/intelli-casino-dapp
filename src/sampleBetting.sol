@@ -147,3 +147,8 @@ contract BettingContract {
         games[_gameId].state = GameState.WINNERS_DECLARED;
     }
 }
+
+// game.casinoBetsTotal = 70
+// game.playerBetsTotal = 110
+// payout ratio = (70 * 10000) / 110 == 6,363.6363636364
+// winning = (45 * (10000 + 6,363.6363636364)) / 10000

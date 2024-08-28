@@ -8,11 +8,11 @@ contract IntelliCasinoBetting is Ownable {
     enum GameState {OPEN, CLOSED, FINISHED}
 
     struct Bet {
-        address user;
+        address payable user;
         uint256 amount;
         bool bettingOnPlayer; // true = player wins, false = Intelli Casino wins
         BetState state;
-        // do I need a game ID here?
+        uint256 gameId;
     }
     
     struct Game {
@@ -21,44 +21,60 @@ contract IntelliCasinoBetting is Ownable {
         uint256 playerBetsTotal;
         uint256 casinoBetsTotal;
         uint256 totalBetPool;
-        mapping(address => Bet[]) bets; // mapping of user address to their bets
+        mapping(uint256 => Bet) bets; // mapping of user address to their bets
+        address[] betters;
     }
     
     mapping(uint256 => Game) public games;
 
-    event NewGame(uint256 gameId, string description);
-    event NewBet(uint256 gameId, address user, bool bettingOnPlayer, uint256 amount);
-    event BetWithdrawn(uint256 gameId, address user, uint256 betIndex); // what's betIndex
+    event NewGame(uint256 gameId);
+    event NewBet(uint256 gameId, address user, bool bettingOnPlayer, uint256 amount, BetState state);
+    event BetWithdrawn(uint256 gameId, address user, uint256 amount);
     event GameClosed(uint256 gameId);
-    event WinningsDistributed(uint256 gameId, uint256 totalWinnings);
+    event WinningsDistributed(uint256 gameId, uint256 totalWinnings, uint256 totalWinners);
     
     constructor() {}
 
-    function createGame(uint256 _gameId, string memory _description) public onlyOwner { // we don't need game description
-        // game should be craeted as Game storage newGame = new Game(_gameId, GameState.OPEN, 0, 0, 0);
-        Game storage newGame = games[_gameId]; // question the whole new Game generation
-        newGame.id = _gameId;
-        newGame.state = GameState.OPEN;
-        newGame.playerBetsTotal = 0;
-        newGame.casinoBetsTotal = 0;
-        newGame.totalBetPool = 0;
+    function findBetIndex(uint256[] storage betters, uint256 better) internal view returns (uint256) {
+        for (uint256 i = 0; i < betters.length; i++) {
+            if (betters[i] == better) {
+                return i;
+            } else {
+                return -1;
+            }
+        }
+    }
 
-        emit NewGame(_gameId, _description); // replace it with game state
+    function createGame(uint256 _gameId) public onlyOwner {
+        require(games[_gameId].state == GameState.FINISHED, "Game with this ID already exists or is not finished yet.");
+        Game memory newGame = Game(_gameId, GameState.OPEN, 0, 0, 0); // check if this is correct, or should it actually be Game storage game = games[_gameId];
+        games[_gameId] = newGame;
+
+        emit NewGame(newGame.id);
     }
     
     function placeBet(uint256 _gameId, bool bettingOnPlayer) public payable {
+        require(games[_gameId], "Game does not exist");
         require(games[_gameId].state == GameState.OPEN, "Game is not open for betting");
         require(msg.value > 0, "Bet amount must be greater than 0");
 
         Game storage game = games[_gameId];
-        Bet memory newBet = Bet({
-            user: msg.sender,
-            amount: msg.value,
-            bettingOnPlayer: bettingOnPlayer,
-            state: BetState.PENDING
-        });
+        uint256 betIndex = findBetIndex(game.betters, msg.sender);
+        if (betIndex > 0) {
+            Bet memory existingBet = game.bets[betIndex]
+            require(bet.user == msg.sender, "This isn't your bet");
+            existingBet.amount += msg.value
+        } else {
+            Bet memory newBet = Bet({
+                user: msg.sender,
+                amount: msg.value,
+                bettingOnPlayer: bettingOnPlayer,
+                state: BetState.PENDING
+            });
 
-        game.bets[msg.sender].push(newBet);
+            game.betters.push(msg.sender);
+            game.bets[game.betters.length - 1] = newBet
+        }
 
         if (bettingOnPlayer) {
             game.playerBetsTotal += msg.value;
@@ -71,11 +87,13 @@ contract IntelliCasinoBetting is Ownable {
         emit NewBet(_gameId, msg.sender, bettingOnPlayer, msg.value);
     }
 
-    function withdrawBet(uint256 _gameId, uint256 betIndex) public {
+    function withdrawBet(uint256 _gameId) public {
+        require(games[_gameId], "Game does not exist");
         Game storage game = games[_gameId];
         require(game.state == GameState.OPEN, "Game is not open for bet withdrawal");
-
-        Bet storage bet = game.bets[msg.sender][betIndex];
+        uint256 betIndex = findBetIndex(game.betters, msg.sender);
+        require(betIndex >= 0, "You don't have bets on this game");
+        Bet storage bet = game.bets[betIndex];
         require(bet.state == BetState.PENDING, "Bet is not pending or already withdrawn");
 
         if (bet.bettingOnPlayer) {
@@ -87,11 +105,11 @@ contract IntelliCasinoBetting is Ownable {
         game.totalBetPool -= bet.amount;
         payable(msg.sender).transfer(bet.amount);
 
-        // question this, and maybe we need a different data structure to keep bets in the game and to find them quicker
-        // something like Game => user address => bet.id => bet
-        // Remove bet from user's bet list
-        game.bets[msg.sender][betIndex] = game.bets[msg.sender][game.bets[msg.sender].length - 1];
-        game.bets[msg.sender].pop();
+        uint256 lastIndex = game.betters.length - 1;
+        game.betters[betIndex] = game.betters[lastIndex]; // replace the old betters address with the last one in the array
+        game.bets[betIndex] = game.bets[lastIndex]; // replace the old bet key index with the last on the mapping
+        game.betters.pop() // delete the last betters address
+        delete game.bets[lastIndex] // delete the duplicate k/v address/Bet pair
 
         emit BetWithdrawn(_gameId, msg.sender, betIndex); // pass actual game.id
     }
@@ -128,12 +146,10 @@ contract IntelliCasinoBetting is Ownable {
     }
 
     function distributeToWinners(Game storage game, bool playerWon, uint256 payoutRatio) internal {
-        // TODO: need to make sure this function is only called by the owner of the contract
-        for (uint i = 0; i < game.bets[msg.sender].length; i++) {
-            Bet storage bet = game.bets[msg.sender][i];
-            // TODO: add logic to distribute to only winning users according to `bet.bettingOnPlayer`
-            if ((playerWon && bet.bettingOnPlayer) || (!playerWon && !bet.bettingOnPlayer)) {
-                uint256 winnings = (bet.amount * (10000 + payoutRatio)) / 10000; // the logic is correct
+        for (uint256 i = 0; i < game.betters.length; i++) {
+            Bet storage bet = game.bets[i];
+            if (playerWon == bet.bettingOnPlayer) {
+                uint256 winnings = (bet.amount * (10000 + payoutRatio)) / 10000;
                 payable(bet.user).transfer(winnings);
                 bet.state = BetState.WON;
             } else {
