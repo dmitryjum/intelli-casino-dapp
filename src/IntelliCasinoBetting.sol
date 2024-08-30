@@ -62,9 +62,9 @@ contract IntelliCasinoBetting is Ownable {
         uint256 betIndex = findBetIndex(game.betters, msg.sender);
         Bet memory bet;
         if (betIndex > 0) {
-            bet = game.bets[betIndex]
+            bet = game.bets[betIndex];
             require(bet.user == msg.sender, "This isn't your bet");
-            bet.amount += msg.value
+            bet.amount += msg.value;
         } else {
             bet = Bet({
                 user: msg.sender,
@@ -96,7 +96,7 @@ contract IntelliCasinoBetting is Ownable {
         require(betIndex >= 0, "You don't have bets on this game");
         Bet storage bet = game.bets[betIndex];
         require(bet.state == BetState.PENDING, "Bet is not pending or already withdrawn");
-        uint256 betAmount = bet.amount
+        uint256 betAmount = bet.amount;
         if (bet.bettingOnPlayer) {
             game.playerBetsTotal -= betAmount;
         } else {
