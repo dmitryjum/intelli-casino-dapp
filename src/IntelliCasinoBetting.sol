@@ -21,8 +21,8 @@ contract IntelliCasinoBetting is Ownable {
         uint256 playerBetsTotal;
         uint256 casinoBetsTotal;
         uint256 totalBetPool;
-        mapping(uint256 => Bet) bets; // mapping of betters array indxes to their bets
-        address[] betters;
+        mapping(uint256 => Bet) bets; // mapping of bettors array indxes to their bets
+        address[] bettors;
     }
     
     mapping(uint256 => Game) public games;
@@ -35,46 +35,49 @@ contract IntelliCasinoBetting is Ownable {
     
     constructor() {}
 
-    function findBetIndex(uint256[] storage betters, uint256 better) internal view returns (uint256) {
-        for (uint256 i = 0; i < betters.length; i++) {
-            if (betters[i] == better) {
+    function findBetIndex(address[] storage bettors, address bettor) internal view returns (uint256) {
+        for (uint256 i = 0; i < bettors.length; i++) {
+            if (bettors[i] == bettor) {
                 return i;
-            } else {
-                return -1;
             }
         }
+        return type(uint256).max; // Returning max uint256 as an indicator of "not found"
     }
 
     function createGame(uint256 _gameId) public onlyOwner {
         require(games[_gameId].state == GameState.FINISHED, "Game with this ID already exists or is not finished yet.");
-        Game memory newGame = Game(_gameId, GameState.OPEN, 0, 0, 0); // check if this is correct, or should it actually be Game storage game = games[_gameId];
-        games[_gameId] = newGame;
+        Game memory newGame = games[_gameId];
+        newGame.id = _gameId;
+        newGame.state = GameState.OPEN;
+        newGame.playerBetsTotal = 0;
+        newGame.casinoBetsTotal = 0;
+        newGame.totalBetPool = 0;
 
-        emit NewGame(newGame.id);
+        emit NewGame(_gameId);
     }
     
     function placeBet(uint256 _gameId, bool bettingOnPlayer) public payable {
-        require(games[_gameId], "Game does not exist");
         require(games[_gameId].state == GameState.OPEN, "Game is not open for betting");
         require(msg.value > 0, "Bet amount must be greater than 0");
 
         Game storage game = games[_gameId];
-        uint256 betIndex = findBetIndex(game.betters, msg.sender);
+        uint256 betIndex = findBetIndex(game.bettors, msg.sender);
         Bet memory bet;
-        if (betIndex > 0) {
-            bet = game.bets[betIndex]
+        if (betIndex != type(uint256).max) {
+            bet = game.bets[betIndex];
             require(bet.user == msg.sender, "This isn't your bet");
-            bet.amount += msg.value
+            bet.amount += msg.value;
         } else {
             bet = Bet({
                 user: msg.sender,
                 amount: msg.value,
                 bettingOnPlayer: bettingOnPlayer,
-                state: BetState.PENDING
+                state: BetState.PENDING,
+                gameId: _gameId
             });
 
-            game.betters.push(msg.sender);
-            game.bets[game.betters.length - 1] = bet
+            game.bettors.push(msg.sender);
+            game.bets[game.bettors.length - 1] = bet;
         }
 
         if (bettingOnPlayer) {
@@ -85,18 +88,17 @@ contract IntelliCasinoBetting is Ownable {
 
         game.totalBetPool += msg.value;
 
-        emit NewBet(_gameId, msg.sender, bettingOnPlayer, msg.value);
+        emit NewBet(_gameId, msg.sender, bettingOnPlayer, msg.value, BetState.PENDING);
     }
 
     function withdrawBet(uint256 _gameId) public {
-        require(games[_gameId], "Game does not exist");
-        Game storage game = games[_gameId];
         require(game.state == GameState.OPEN, "Game is not open for bet withdrawal");
-        uint256 betIndex = findBetIndex(game.betters, msg.sender);
-        require(betIndex >= 0, "You don't have bets on this game");
+        Game storage game = games[_gameId];
+        uint256 betIndex = findBetIndex(game.bettors, msg.sender);
+        require(betIndex != type(uint256).max, "You don't have bets on this game");
         Bet storage bet = game.bets[betIndex];
         require(bet.state == BetState.PENDING, "Bet is not pending or already withdrawn");
-        uint256 betAmount = bet.amount
+        uint256 betAmount = bet.amount;
         if (bet.bettingOnPlayer) {
             game.playerBetsTotal -= betAmount;
         } else {
@@ -106,10 +108,10 @@ contract IntelliCasinoBetting is Ownable {
         game.totalBetPool -= betAmount;
         payable(msg.sender).transfer(betAmount);
 
-        uint256 lastIndex = game.betters.length - 1;
-        game.betters[betIndex] = game.betters[lastIndex]; // replace the old betters address with the last one in the array
+        uint256 lastIndex = game.bettors.length - 1;
+        game.bettors[betIndex] = game.bettors[lastIndex]; // replace the old bettors address with the last one in the array
         game.bets[betIndex] = game.bets[lastIndex]; // replace the old bet key index with the last on the mapping
-        game.betters.pop() // delete the last betters address
+        game.bettors.pop() // delete the last bettors address
         delete game.bets[lastIndex] // delete the duplicate k/v address/Bet pair
 
         emit BetWithdrawn(_gameId, msg.sender, betAmount);
@@ -130,36 +132,35 @@ contract IntelliCasinoBetting is Ownable {
 
         uint256 commission = (game.totalBetPool * 3) / 100; // 3% commission
         uint256 totalWinnings = game.totalBetPool - commission;
-        uint256 casinoBetsTotalMinusComission = (game.casinoBetsTotal * 3) / 100;
-        uint256 playerBetsTotalMinusComission = (game.playerBetsTotal * 3) / 100;
+        uint256 casinoBetsTotalMinusComission = game.casinoBetsTotal - (game.casinoBetsTotal * 3 / 100);
+        uint256 playerBetsTotalMinusComission = game.playerBetsTotal - (game.playerBetsTotal * 3 / 100);
         // formula( bet + (bet / totalBetsOnYourTeam * total bet on the other team)
         uint256 payoutRatio = 0;
         if (playerWon) {
-            payoutRatio = (casinoBetsTotalMinusComission * 10000) / playerBetsTotalMinusComission; // the logic is correct
-            distributeToWinners(game, true, payoutRatio, totalWinnings);
+            payoutRatio = (casinoBetsTotalMinusComission * 10000) / playerBetsTotalMinusComission;
         } else {
             payoutRatio = (playerBetsTotalMinusComission * 10000) / casinoBetsTotalMinusComission;
-            distributeToWinners(game, false, payoutRatio, totalWinnings);
         }
 
+        uint256 totalWinners = distributeToWinners(game, playerWon, payoutRatio);
         // Transfer the commission to the owner of the contract
         payable(owner()).transfer(commission);
+        emit WinningsDistributed(_gameId, totalWinnings, totalWinners);
     }
 
-    function distributeToWinners(Game storage game, bool playerWon, uint256 payoutRatio, uint256 totalWinnings) internal {
+    function distributeToWinners(Game storage game, bool playerWon, uint256 payoutRatio) internal returns (uint256 totalWinners) {
         uint256 totalWinners = 0
-        for (uint256 i = 0; i < game.betters.length; i++) {
+        for (uint256 i = 0; i < game.bettors.length; i++) {
             Bet storage bet = game.bets[i];
             if (playerWon == bet.bettingOnPlayer) {
                 uint256 winnings = (bet.amount * (10000 + payoutRatio)) / 10000;
-                payable(bet.user).transfer(winnings);
+                bet.user.transfer(winnings);
                 bet.state = BetState.WON;
                 totalWinners++;
             } else {
                 bet.state = BetState.LOST;
             }
         }
-
-        emit WinningsDistributed(_gameId, totalWinnings, totalWinners);
+        return totalWinners;
     }
 }
