@@ -129,10 +129,10 @@ contract IntelliCasinoBetting is Ownable {
         game.bettors.pop();
         delete game.bets[lastIndex];
 
+        emit BetWithdrawn(_gameId, msg.sender, betAmount);
         bool sent = bet.user.send(betAmount);
         if (!sent) revert TransferFailed();
 
-        emit BetWithdrawn(_gameId, msg.sender, betAmount);
     }
 
     function closeGame(uint256 _gameId) external onlyOwner onlyExistingGame(_gameId) {
@@ -165,12 +165,11 @@ contract IntelliCasinoBetting is Ownable {
 
 
         // Transfer the commission to the owner of the contract
+        uint256 totalWinners = distributeToWinners(game, playerWon, payoutRatio);
+        emit WinningsDistributed(_gameId, totalWinnings, totalWinners);
+
         bool sent = payable(owner()).send(commission);
         if (!sent) revert TransferFailed();
-
-        uint256 totalWinners = distributeToWinners(game, playerWon, payoutRatio);
-
-        emit WinningsDistributed(_gameId, totalWinnings, totalWinners);
     }
 
     function distributeToWinners(Game storage game, bool playerWon, uint256 payoutRatio) internal returns (uint256 totalWinners) {
