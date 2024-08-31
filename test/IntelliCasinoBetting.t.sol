@@ -2,256 +2,215 @@
 pragma solidity ^0.8.19;
 
 import {Test} from "forge-std/Test.sol";
-// import "forge-std/console.sol";
 import {IntelliCasinoBetting} from "../src/IntelliCasinoBetting.sol";
 
 contract IntelliCasinoBettingTest is Test {
-    IntelliCasinoBetting public casino;
-    // uint256 campaignId = 1;
-    // address owner = address(this);
-    // uint256 goal = 3 ether;
-    // uint256 duration = 5 days;
-    // uint256 deadline = block.timestamp + duration;
-    // address contributor = address(1);
-    // uint256 contributeAmount = 1 ether;
+    IntelliCasinoBetting public betting;
+    uint256 gameId = 1;
+    address owner = address(this);
+    address player = address(1);
+    address casino = address(2);
+    uint256 betAmount = 1 ether;
 
     function setUp() public virtual {
-        casino = new IntelliCasinoBetting();
+        betting = new IntelliCasinoBetting();
     }
 
-    function createGame() internal {
-        
+    function createGame(uint256 _gameId) internal {
+        betting.createGame(_gameId);
     }
 
-    function placeBet() internal {
-        
+    function placeBet(uint256 _gameId, bool _bettingOnPlayer, address bettor) internal {
+        vm.prank(bettor);
+        betting.placeBet{value: betAmount}(_gameId, _bettingOnPlayer);
     }
 
-    function withdrawBet() internal {
-        
+    function withdrawBet(uint256 _gameId, address bettor) internal {
+        vm.prank(bettor);
+        betting.withdrawBet(_gameId);
+    }
+
+    function closeGame(uint256 _gameId) internal {
+        betting.closeGame(_gameId);
+    }
+
+    function distributeWinnings(uint256 _gameId, bool playerWon) internal {
+        betting.distributeWinnings(_gameId, playerWon);
     }
 
     receive() external payable {}
 }
 
-// contract CreateCampaignTest is SecureCrowdfundingTest {
-//     event CampaignCreated(uint256 indexed campaignId, address owner, uint256 goal, uint256 deadline);
+contract CreateGameTest is IntelliCasinoBettingTest {
+    event NewGame(uint256 indexed gameId);
 
-//     function setUp() public override {
-//         super.setUp();
-//     }
+    function setUp() public override {
+        super.setUp();
+    }
 
-//     function test_createCampaign() public {
-//         vm.expectEmit(true, true, true, true);
-//         emit CampaignCreated(campaignId, owner, goal, deadline);
+    function test_createGame() public {
+        vm.expectEmit(true, true, true, true);
+        emit NewGame(gameId);
 
-//         createCampaign(goal, duration);
-//         (address _owner, uint256 _goal, uint256 _deadline, uint256 _fundsRaised, bool _claimed) =
-//             crowdFund.campaigns(campaignId);
-//         assertEq(_goal, goal);
-//         assertEq(_deadline, deadline);
-//         assertEq(_owner, owner);
-//         assertFalse(_claimed);
-//         assertEq(_fundsRaised, 0);
-//     }
+        createGame(gameId);
 
-//     function test_invalidGoal() public {
-//         vm.expectRevert(SecureCrowdfunding.InvalidGoal.selector);
-//         createCampaign(0, duration);
-//     }
-// }
+        (uint256 _id, IntelliCasinoBetting.GameState state,,,) = betting.games(gameId);
+        assertEq(_id, gameId);
+        assertEq(uint(state), uint(IntelliCasinoBetting.GameState.OPEN));
+    }
 
-// contract ContributeCompaignTest is SecureCrowdfundingTest {
-//     event ContributionMade(uint256 indexed campaignId, address contributor, uint256 amount);
+    function test_createGameAlreadyExists() public {
+        createGame(gameId);
+        vm.expectRevert(IntelliCasinoBetting.GameAlreadyExists.selector);
+        createGame(gameId);
+    }
+}
 
-//     function setUp() public override {
-//         super.setUp();
-//         createCampaign(goal, duration);
-//     }
+contract PlaceBetTest is IntelliCasinoBettingTest {
+    event NewBet(uint256 indexed gameId, address indexed user, bool bettingOnPlayer, uint256 amount, IntelliCasinoBetting.BetState state);
 
-//     function test_contribute() public {
-//         vm.expectEmit(true, true, true, true);
-//         hoax(contributor, goal);
-//         emit ContributionMade(campaignId, contributor, contributeAmount);
+    function setUp() public override {
+        super.setUp();
+        createGame(gameId);
+    }
 
-//         contribute(campaignId, contributeAmount);
-//         (address _owner, uint256 _goal, uint256 _deadline, uint256 _fundsRaised, bool _claimed) =
-//             crowdFund.campaigns(campaignId);
-        
-//         assertEq(_goal, goal);
-//         assertEq(_deadline, deadline);
-//         assertEq(_owner, owner);
-//         assertFalse(_claimed);
-//         assertEq(_fundsRaised, contributeAmount);
-//     }
+    function test_placeBet() public {
+        vm.expectEmit(true, true, true, true);
+        emit NewBet(gameId, player, true, betAmount, IntelliCasinoBetting.BetState.PENDING);
 
-//     function test_contributeCampaignEnded() public {
-//         hoax(contributor, contributeAmount);
-//         vm.warp(deadline);
-//         vm.expectRevert(SecureCrowdfunding.CampaignEnded.selector);
-//         contribute(campaignId, contributeAmount);
-//     }
+        placeBet(gameId, true, player);
 
-//     function test_contributeInvalidContribution() public {
-//         hoax(contributor, contributeAmount);
-//         vm.expectRevert(SecureCrowdfunding.InvalidContribution.selector);
-//         contribute(campaignId, 0);
-//     }
+        (address user, uint256 amount,,,) = betting.games(gameId).bets(0);
+        assertEq(user, player);
+        assertEq(amount, betAmount);
+    }
 
-//     function test_compaignDoesNotExist() public {
-//         hoax(contributor, contributeAmount);
-//         vm.expectRevert(SecureCrowdfunding.InvalidCampaignId.selector);
-//         contribute(type(uint256).max, contributeAmount);
-//     }
-// }
+    function test_placeBetGameNotOpen() public {
+        closeGame(gameId);
+        vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
+        placeBet(gameId, true, player);
+    }
 
-// contract ClaimFundsTest is SecureCrowdfundingTest {
-//     event FundsClaimed(uint256 indexed campaignId, uint256 amount);
+    function test_placeBetNoAmount() public {
+        vm.prank(player);
+        vm.expectRevert(IntelliCasinoBetting.NotEnoughBetAmount.selector);
+        betting.placeBet{value: 0}(gameId, true);
+    }
 
-//     function setUp() public override {
-//         super.setUp();
-//         createCampaign(goal, duration);
-//     }
+    function test_placeBetAddToExisting() public {
+        placeBet(gameId, true, player);
+        vm.deal(player, 2 ether);
+        vm.prank(player);
+        betting.placeBet{value: 1 ether}(gameId, true);
 
-//     function test_claimFunds() public {
-//         hoax(contributor, goal);
-//         contribute(campaignId, goal);
+        (address user, uint256 amount,,,) = betting.games(gameId).bets(0);
+        assertEq(user, player);
+        assertEq(amount, 2 ether);
+    }
+}
 
-//         vm.warp(deadline);
-//         vm.expectEmit(true, true, true, true);
-//         emit FundsClaimed(campaignId, goal);
+contract WithdrawBetTest is IntelliCasinoBettingTest {
+    event BetWithdrawn(uint256 indexed gameId, address indexed user, uint256 amount);
 
-//         claimFunds(campaignId);
-//         (,,,, bool _claimed) = crowdFund.campaigns(campaignId);
-//         assertEq(_claimed, true);
-//     }
+    function setUp() public override {
+        super.setUp();
+        createGame(gameId);
+        placeBet(gameId, true, player);
+    }
 
-//     function test_CampaignNotEnded() public {
-//         hoax(contributor, goal);
-//         contribute(campaignId, goal);
+    function test_withdrawBet() public {
+        vm.expectEmit(true, true, true, true);
+        emit BetWithdrawn(gameId, player, betAmount);
 
-//         vm.expectRevert(SecureCrowdfunding.CampaignNotEnded.selector);
-//         claimFunds(campaignId);
-//     }
+        uint256 playerBalanceBefore = player.balance;
+        withdrawBet(gameId, player);
+        uint256 playerBalanceAfter = player.balance;
 
-//     function test_InvalidCampaignId() public {
-//         hoax(contributor, goal);
-//         contribute(campaignId, goal);
+        assertEq(playerBalanceAfter - playerBalanceBefore, betAmount);
+    }
 
-//         vm.expectRevert(SecureCrowdfunding.InvalidCampaignId.selector);
-//         claimFunds(3);
-//     }
+    function test_withdrawBetGameNotOpen() public {
+        closeGame(gameId);
+        vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
+        withdrawBet(gameId, player);
+    }
 
-//     function test_GoalNotReached() public {
-//         hoax(contributor, contributeAmount);
-//         contribute(campaignId, contributeAmount);
-//         vm.warp(deadline);
+    function test_withdrawBetDoesNotExist() public {
+        address nonBettor = address(3);
+        vm.expectRevert(IntelliCasinoBetting.BetDoesNotExist.selector);
+        withdrawBet(gameId, nonBettor);
+    }
 
-//         vm.expectRevert(SecureCrowdfunding.GoalNotReached.selector);
-//         claimFunds(campaignId);
-//     }
+    function test_withdrawBetFailedTransfer() public {
+        vm.prank(address(3));
+        vm.deal(address(betting), betAmount - 1); // Deal less Ether than needed
+        vm.expectRevert(IntelliCasinoBetting.TransferFailed.selector);
+        withdrawBet(gameId, player);
+    }
+}
 
-//     function test_FundsAlreadyClaimed() public {
-//         hoax(contributor, goal);
-//         contribute(campaignId, goal);
+contract CloseGameTest is IntelliCasinoBettingTest {
+    event GameClosed(uint256 indexed gameId);
 
-//         vm.warp(deadline);
+    function setUp() public override {
+        super.setUp();
+        createGame(gameId);
+    }
 
-//         claimFunds(campaignId);
-//         vm.expectRevert(SecureCrowdfunding.FundsAlreadyClaimed.selector);
-//         claimFunds(campaignId);
-//     }
+    function test_closeGame() public {
+        vm.expectEmit(true, true, true, true);
+        emit GameClosed(gameId);
 
-//     function test_NotCampaignOwner() public {
-//         hoax(contributor, goal);
-//         contribute(campaignId, goal);
-//         vm.warp(deadline);
-//         vm.prank(contributor);
+        closeGame(gameId);
 
-//         vm.expectRevert(SecureCrowdfunding.NotOwnerOfCampaign.selector);
-//         claimFunds(campaignId);
-//     }
+        (, IntelliCasinoBetting.GameState state,,,) = betting.games(gameId);
+        assertEq(uint(state), uint(IntelliCasinoBetting.GameState.CLOSED));
+    }
 
-//     function test_TransferFailed() public {
-//         deal(contributor, goal);
-//         hoax(contributor);
-//         contribute(campaignId, goal);
+    function test_closeGameNotOpen() public {
+        closeGame(gameId);
+        vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
+        closeGame(gameId);
+    }
+}
 
-//         // Warp to after the campaign deadline
-//         vm.warp(block.timestamp + duration + 1);
+contract DistributeWinningsTest is IntelliCasinoBettingTest {
+    event WinningsDistributed(uint256 indexed gameId, uint256 totalWinnings, uint256 totalWinners);
 
-//         // Ensure the contract has insufficient balance
-//         deal(address(crowdFund), goal - 1);  // Deal less Ether than needed
+    function setUp() public override {
+        super.setUp();
+        createGame(gameId);
+        placeBet(gameId, true, player);
+        placeBet(gameId, false, casino);
+        closeGame(gameId);
+    }
 
-//         // Prank as the owner to claim funds
-//         vm.prank(owner);
-//         vm.expectRevert(SecureCrowdfunding.TransferFailed.selector);
-//         crowdFund.claimFunds(campaignId);
-//     }
-// }
+    function test_distributeWinnings() public {
+        vm.expectEmit(true, true, true, true);
+        emit WinningsDistributed(gameId, 0.97 ether, 1);
 
-// contract WithdrawContributionTest is SecureCrowdfundingTest {
-//     function setUp() public override {
-//         super.setUp();
-//         createCampaign(goal, duration);
-//     }
+        distributeWinnings(gameId, true);
 
-//     function test_withdrawContributionTest() public {
-//         hoax(contributor, contributeAmount);
-//         contribute(campaignId, contributeAmount);
-//         uint256 contributorBalanceBeforeRefund = contributor.balance;
-//         (,,, uint256 _fundsRaisedBeforeWithdrawal,) = crowdFund.campaigns(campaignId);
-//         vm.warp(deadline);
-//         vm.prank(contributor);
-//         withdrawContribution(campaignId);
-//         uint256 contributorBalanceAfterRefund = contributor.balance;
-//         (,,, uint256 _fundsRaisedAfterWithdrawal,) = crowdFund.campaigns(campaignId);
-//         assertEq(_fundsRaisedAfterWithdrawal, _fundsRaisedBeforeWithdrawal - contributeAmount);
-//         assertEq(contributorBalanceBeforeRefund, 0);
-//         assertEq(contributorBalanceAfterRefund, contributeAmount);
+        (, IntelliCasinoBetting.GameState state,,,) = betting.games(gameId);
+        assertEq(uint(state), uint(IntelliCasinoBetting.GameState.FINISHED));
+    }
 
-//     }
+    function test_distributeWinningsGameNotClosed() public {
+        createGame(2);
+        vm.expectRevert(IntelliCasinoBetting.GameNotClosed.selector);
+        distributeWinnings(2, true);
+    }
 
-//     function test_campaignNotEnded() public {
-//         vm.expectRevert(SecureCrowdfunding.CampaignNotEnded.selector);
-//         withdrawContribution(campaignId);
-//     }
+    function test_distributeWinningsAlreadyFinished() public {
+        distributeWinnings(gameId, true);
+        vm.expectRevert(IntelliCasinoBetting.GameAlreadyFinished.selector);
+        distributeWinnings(gameId, true);
+    }
 
-//     function test_GoalReached() public {
-//         hoax(contributor, goal);
-//         contribute(campaignId, goal);
-//         vm.warp(deadline);
-//         vm.expectRevert(SecureCrowdfunding.GoalReached.selector);
-//         withdrawContribution(campaignId);
-//     }
-
-//     function test_InvalidCampaignId() public {
-//         vm.warp(deadline);
-//         vm.expectRevert(SecureCrowdfunding.InvalidCampaignId.selector);
-//         withdrawContribution(4);
-//     }
-
-//     function test_TransferFailed() public {
-//         // deal(contributor, contributeAmount);
-//         hoax(contributor, contributeAmount);
-//         contribute(campaignId, contributeAmount);
-
-//         // Warp to after the campaign deadline
-//         vm.warp(block.timestamp + duration + 1);
-
-//         // Ensure the contract has insufficient balance
-//         deal(address(crowdFund), contributeAmount - 1);  // Deal less Ether than needed
-
-//         // Prank as the owner to claim funds
-//         vm.expectRevert(SecureCrowdfunding.TransferFailed.selector);
-//         vm.prank(contributor);
-//         withdrawContribution(campaignId);
-//     }
-
-//     function test_NoContributionMade() public {
-//         hoax(address(4));
-//         vm.warp(deadline);
-//         vm.expectRevert(SecureCrowdfunding.NoContributionMade.selector);
-//         withdrawContribution(campaignId);
-//     }
-// }
+    function test_distributeWinningsFailedTransfer() public {
+        vm.prank(address(3));
+        vm.deal(address(betting), 1 ether - 1); // Deal less Ether than needed
+        vm.expectRevert(IntelliCasinoBetting.TransferFailed.selector);
+        distributeWinnings(gameId, true);
+    }
+}
