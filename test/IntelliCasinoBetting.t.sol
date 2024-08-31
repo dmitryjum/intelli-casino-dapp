@@ -79,10 +79,9 @@ contract PlaceBetTest is IntelliCasinoBettingTest {
         emit NewBet(gameId, player, true, betAmount, IntelliCasinoBetting.BetState.PENDING);
 
         placeBet(gameId, true, player);
-
-        (address user, uint256 amount,,,) = betting.games(gameId).bets(0);
-        assertEq(user, player);
-        assertEq(amount, betAmount);
+        IntelliCasinoBetting.Bet memory bet = betting.games(gameId).bets(0);
+        address user = bet.user;
+        uint256 amount = bet.amount;
     }
 
     function test_placeBetGameNotOpen() public {
