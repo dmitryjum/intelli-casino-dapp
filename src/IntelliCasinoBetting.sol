@@ -44,7 +44,7 @@ contract IntelliCasinoBetting is Ownable {
     error TransferFailed();
 
     modifier onlyExistingGame(uint256 _gameId) {
-        if (games[_gameId].state == GameState(0)) revert InvalidGameId();
+        if (games[_gameId].id != _gameId) revert InvalidGameId();
         _;
     }
 
@@ -60,7 +60,7 @@ contract IntelliCasinoBetting is Ownable {
     }
 
     function createGame(uint256 _gameId) external onlyOwner {
-        if (games[_gameId].state != GameState(0)) revert GameAlreadyExists();
+        if (games[_gameId].id == _gameId) revert GameAlreadyExists();
         
         Game storage newGame = games[_gameId];
         newGame.id = _gameId;
