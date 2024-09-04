@@ -109,45 +109,49 @@ contract PlaceBetTest is IntelliCasinoBettingTest {
     }
 }
 
-// contract WithdrawBetTest is IntelliCasinoBettingTest {
-//     event BetWithdrawn(uint256 indexed gameId, address indexed user, uint256 amount);
+contract WithdrawBetTest is IntelliCasinoBettingTest {
+    event BetWithdrawn(uint256 indexed gameId, address indexed user, uint256 amount);
 
-//     function setUp() public override {
-//         super.setUp();
-//         createGame(gameId);
-//         placeBet(gameId, true, player);
-//     }
+    function setUp() public override {
+        super.setUp();
+        createGame(gameId);
+        hoax(bettor, 1 ether);
+        console.log("contract balance before the bet", owner.balance);
+        placeBet(gameId, true, betAmount);
+    }
 
-//     function test_withdrawBet() public {
-//         vm.expectEmit(true, true, true, true);
-//         emit BetWithdrawn(gameId, player, betAmount);
+    function test_withdrawBet() public {
+        vm.expectEmit(true, true, true, true);
+        emit BetWithdrawn(gameId, bettor, betAmount);
 
-//         uint256 playerBalanceBefore = player.balance;
-//         withdrawBet(gameId, player);
-//         uint256 playerBalanceAfter = player.balance;
+        uint256 playerBalanceBefore = bettor.balance;
+        console.log("playerBalance", playerBalanceBefore);
+        console.log("contract balance", owner.balance);
+        withdrawBet(gameId);
+        uint256 playerBalanceAfter = bettor.balance;
 
-//         assertEq(playerBalanceAfter - playerBalanceBefore, betAmount);
-//     }
+        assertEq(playerBalanceAfter - playerBalanceBefore, betAmount);
+    }
 
-//     function test_withdrawBetGameNotOpen() public {
-//         closeGame(gameId);
-//         vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
-//         withdrawBet(gameId, player);
-//     }
+    // function test_withdrawBetGameNotOpen() public {
+    //     closeGame(gameId);
+    //     vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
+    //     withdrawBet(gameId, player);
+    // }
 
-//     function test_withdrawBetDoesNotExist() public {
-//         address nonBettor = address(3);
-//         vm.expectRevert(IntelliCasinoBetting.BetDoesNotExist.selector);
-//         withdrawBet(gameId, nonBettor);
-//     }
+    // function test_withdrawBetDoesNotExist() public {
+    //     address nonBettor = address(3);
+    //     vm.expectRevert(IntelliCasinoBetting.BetDoesNotExist.selector);
+    //     withdrawBet(gameId, nonBettor);
+    // }
 
-//     function test_withdrawBetFailedTransfer() public {
-//         vm.prank(address(3));
-//         vm.deal(address(betting), betAmount - 1); // Deal less Ether than needed
-//         vm.expectRevert(IntelliCasinoBetting.TransferFailed.selector);
-//         withdrawBet(gameId, player);
-//     }
-// }
+    // function test_withdrawBetFailedTransfer() public {
+    //     vm.prank(address(3));
+    //     vm.deal(address(betting), betAmount - 1); // Deal less Ether than needed
+    //     vm.expectRevert(IntelliCasinoBetting.TransferFailed.selector);
+    //     withdrawBet(gameId, player);
+    // }
+}
 
 // contract CloseGameTest is IntelliCasinoBettingTest {
 //     event GameClosed(uint256 indexed gameId);

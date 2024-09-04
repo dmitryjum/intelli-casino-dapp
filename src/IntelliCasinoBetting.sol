@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 import "./Ownable.sol";
-
+import "forge-std/console.sol";
 contract IntelliCasinoBetting is Ownable {
 
     enum BetState {PENDING, WON, LOST}
@@ -90,7 +90,7 @@ contract IntelliCasinoBetting is Ownable {
             
             game.bettors.push(msg.sender);
         }
-
+        
         if (_bettingOnPlayer) {
             game.playerBetsTotal += msg.value;
         } else {
