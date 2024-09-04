@@ -22,8 +22,8 @@ contract IntelliCasinoBettingTest is Test {
         betting.createGame(_gameId);
     }
 
-    function placeBet(uint256 _gameId, bool _bettingOnPlayer) internal {
-        betting.placeBet{value: betAmount}(_gameId, _bettingOnPlayer);
+    function placeBet(uint256 _gameId, bool _bettingOnPlayer, uint256 _betAmount) internal {
+        betting.placeBet{value: _betAmount}(_gameId, _bettingOnPlayer);
     }
 
     function withdrawBet(uint256 _gameId) internal {
@@ -79,7 +79,7 @@ contract PlaceBetTest is IntelliCasinoBettingTest {
         hoax(bettor, betAmount);
         emit NewBet(gameId, bettor, true, betAmount, IntelliCasinoBetting.BetState.PENDING);
         
-        placeBet(gameId, true);
+        placeBet(gameId, true, betAmount);
         (,,uint256 _playerBetsTotal, uint256 _casinoBetsTotal, uint256 _totalBetPool) = betting.games(gameId);
         assertEq(_playerBetsTotal, betAmount);
         assertEq(_casinoBetsTotal, 0);
@@ -90,24 +90,23 @@ contract PlaceBetTest is IntelliCasinoBettingTest {
         closeGame(gameId); // game's closed by the owner (this contract);
         hoax(bettor, betAmount); // bettor becomes the msg.sender for "placeBet" function
         vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
-        placeBet(gameId, true);
+        placeBet(gameId, true, betAmount);
     }
 
-    // function test_placeBetNoAmount() public {
-    //     vm.prank(player);
-    //     vm.expectRevert(IntelliCasinoBetting.NotEnoughBetAmount.selector);
-    //     betting.placeBet{value: 0}(gameId, true);
-    // }
+    function test_placeBetNoAmount() public {
+        vm.prank(bettor);
+        vm.expectRevert(IntelliCasinoBetting.NotEnoughBetAmount.selector);
+        placeBet(gameId, true, 0);
+    }
 
-    // function test_placeBetAddToExisting() public {
-    //     placeBet(gameId, true);
-    //     vm.deal(player, 2 ether);
-    //     vm.prank(player);
-    //     betting.placeBet{value: 1 ether}(gameId, true);
+    function test_placeBetAddToExisting() public {
+        hoax(bettor, 3 ether);
+        placeBet(gameId, true, betAmount);
+        placeBet(gameId, true, betAmount);
 
-    //     (,,uint256 _playerBetsTotal,,) = betting.games(gameId);
-    //     assertEq(_playerBetsTotal, 3 ether);
-    // }
+        (,,uint256 _playerBetsTotal,,) = betting.games(gameId);
+        assertEq(_playerBetsTotal, 2 ether);
+    }
 }
 
 // contract WithdrawBetTest is IntelliCasinoBettingTest {
