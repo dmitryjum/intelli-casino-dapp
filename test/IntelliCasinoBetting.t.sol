@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.18;
 
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
@@ -76,10 +76,11 @@ contract PlaceBetTest is IntelliCasinoBettingTest {
 
     function test_placeBet() public {
         vm.expectEmit(true, true, true, true);
-        hoax(bettor, 1 ether);
+        hoax(bettor, betAmount);
+        emit NewBet(gameId, bettor, true, betAmount, IntelliCasinoBetting.BetState.PENDING);
+        
         placeBet(gameId, true);
         (,,uint256 _playerBetsTotal,,) = betting.games(gameId);
-        console.log(_playerBetsTotal);
         assertEq(_playerBetsTotal, betAmount);
     }
 
