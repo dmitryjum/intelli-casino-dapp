@@ -80,15 +80,18 @@ contract PlaceBetTest is IntelliCasinoBettingTest {
         emit NewBet(gameId, bettor, true, betAmount, IntelliCasinoBetting.BetState.PENDING);
         
         placeBet(gameId, true);
-        (,,uint256 _playerBetsTotal,,) = betting.games(gameId);
+        (,,uint256 _playerBetsTotal, uint256 _casinoBetsTotal, uint256 _totalBetPool) = betting.games(gameId);
         assertEq(_playerBetsTotal, betAmount);
+        assertEq(_casinoBetsTotal, 0);
+        assertEq(_totalBetPool, betAmount);
     }
 
-    // function test_placeBetGameNotOpen() public {
-    //     closeGame(gameId);
-    //     vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
-    //     placeBet(gameId, true);
-    // }
+    function test_placeBetGameNotOpen() public {
+        closeGame(gameId); // game's closed by the owner (this contract);
+        hoax(bettor, betAmount); // bettor becomes the msg.sender for "placeBet" function
+        vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
+        placeBet(gameId, true);
+    }
 
     // function test_placeBetNoAmount() public {
     //     vm.prank(player);
