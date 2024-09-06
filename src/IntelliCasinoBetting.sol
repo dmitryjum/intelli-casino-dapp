@@ -105,7 +105,7 @@ contract IntelliCasinoBetting is Ownable {
     function withdrawBet(uint256 _gameId) external onlyExistingGame(_gameId) {
         Game storage game = games[_gameId];
         if (game.state != GameState.OPEN) revert GameNotOpen();
-
+        
         uint256 betIndex = findBetIndex(game.bettors, msg.sender);
         if (betIndex == type(uint256).max) revert BetDoesNotExist();
         
@@ -113,6 +113,7 @@ contract IntelliCasinoBetting is Ownable {
         if (bet.state != BetState.PENDING) revert BetNotPending();
 
         uint256 betAmount = bet.amount;
+        address payable betUser = bet.user;
         if (bet.bettingOnPlayer) {
             game.playerBetsTotal -= betAmount;
         } else {
@@ -128,9 +129,9 @@ contract IntelliCasinoBetting is Ownable {
         }
         game.bettors.pop();
         delete game.bets[lastIndex];
-
+        
         emit BetWithdrawn(_gameId, msg.sender, betAmount);
-        bool sent = bet.user.send(betAmount);
+        bool sent = betUser.send(betAmount);
         if (!sent) revert TransferFailed();
 
     }

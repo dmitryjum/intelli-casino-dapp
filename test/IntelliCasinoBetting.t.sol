@@ -116,17 +116,15 @@ contract WithdrawBetTest is IntelliCasinoBettingTest {
         super.setUp();
         createGame(gameId);
         hoax(bettor, 1 ether);
-        console.log("contract balance before the bet", owner.balance);
         placeBet(gameId, true, betAmount);
     }
 
     function test_withdrawBet() public {
         vm.expectEmit(true, true, true, true);
+        vm.prank(bettor);
         emit BetWithdrawn(gameId, bettor, betAmount);
 
         uint256 playerBalanceBefore = bettor.balance;
-        console.log("playerBalance", playerBalanceBefore);
-        console.log("contract balance", owner.balance);
         withdrawBet(gameId);
         uint256 playerBalanceAfter = bettor.balance;
 
