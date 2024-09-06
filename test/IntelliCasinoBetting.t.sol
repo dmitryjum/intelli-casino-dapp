@@ -151,30 +151,35 @@ contract WithdrawBetTest is IntelliCasinoBettingTest {
     }
 }
 
-// contract CloseGameTest is IntelliCasinoBettingTest {
-//     event GameClosed(uint256 indexed gameId);
+contract CloseGameTest is IntelliCasinoBettingTest {
+    event GameClosed(uint256 indexed gameId);
 
-//     function setUp() public override {
-//         super.setUp();
-//         createGame(gameId);
-//     }
+    function setUp() public override {
+        super.setUp();
+        createGame(gameId);
+    }
 
-//     function test_closeGame() public {
-//         vm.expectEmit(true, true, true, true);
-//         emit GameClosed(gameId);
+    function test_closeGame() public {
+        vm.expectEmit(true, true, true, true);
+        emit GameClosed(gameId);
 
-//         closeGame(gameId);
+        closeGame(gameId);
 
-//         (, IntelliCasinoBetting.GameState state,,,) = betting.games(gameId);
-//         assertEq(uint(state), uint(IntelliCasinoBetting.GameState.CLOSED));
-//     }
+        (, IntelliCasinoBetting.GameState state,,,) = betting.games(gameId);
+        assertEq(uint(state), uint(IntelliCasinoBetting.GameState.CLOSED));
+    }
 
-//     function test_closeGameNotOpen() public {
-//         closeGame(gameId);
-//         vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
-//         closeGame(gameId);
-//     }
-// }
+    function test_closeGameNotOpen() public {
+        closeGame(gameId);
+        vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
+        closeGame(gameId);
+    }
+
+    function test_closeGameInvalidId() public {
+        vm.expectRevert(IntelliCasinoBetting.InvalidGameId.selector);
+        closeGame(99);
+    }
+}
 
 // contract DistributeWinningsTest is IntelliCasinoBettingTest {
 //     event WinningsDistributed(uint256 indexed gameId, uint256 totalWinnings, uint256 totalWinners);
