@@ -131,24 +131,24 @@ contract WithdrawBetTest is IntelliCasinoBettingTest {
         assertEq(playerBalanceAfter - playerBalanceBefore, betAmount);
     }
 
-    // function test_withdrawBetGameNotOpen() public {
-    //     closeGame(gameId);
-    //     vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
-    //     withdrawBet(gameId, player);
-    // }
+    function test_withdrawBetGameNotOpen() public {
+        closeGame(gameId);
+        vm.expectRevert(IntelliCasinoBetting.GameNotOpen.selector);
+        withdrawBet(gameId);
+    }
 
-    // function test_withdrawBetDoesNotExist() public {
-    //     address nonBettor = address(3);
-    //     vm.expectRevert(IntelliCasinoBetting.BetDoesNotExist.selector);
-    //     withdrawBet(gameId, nonBettor);
-    // }
+    function test_withdrawBetDoesNotExist() public {
+        vm.prank(player);
+        vm.expectRevert(IntelliCasinoBetting.BetDoesNotExist.selector);
+        withdrawBet(gameId);
+    }
 
-    // function test_withdrawBetFailedTransfer() public {
-    //     vm.prank(address(3));
-    //     vm.deal(address(betting), betAmount - 1); // Deal less Ether than needed
-    //     vm.expectRevert(IntelliCasinoBetting.TransferFailed.selector);
-    //     withdrawBet(gameId, player);
-    // }
+    function test_withdrawBetFailedTransfer() public {
+        vm.prank(bettor);
+        vm.deal(address(betting), betAmount - 1); // Deal less Ether than needed
+        vm.expectRevert(IntelliCasinoBetting.TransferFailed.selector);
+        withdrawBet(gameId);
+    }
 }
 
 // contract CloseGameTest is IntelliCasinoBettingTest {
