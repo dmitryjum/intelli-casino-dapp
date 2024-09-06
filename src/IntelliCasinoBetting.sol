@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.18;
 import "./Ownable.sol";
-
+// import "forge-std/console.sol";
 contract IntelliCasinoBetting is Ownable {
 
     enum BetState {PENDING, WON, LOST}
@@ -37,14 +37,13 @@ contract IntelliCasinoBetting is Ownable {
     error GameAlreadyExists();
     error GameNotOpen();
     error GameNotClosed();
-    error GameAlreadyFinished();
     error NotEnoughBetAmount();
     error BetDoesNotExist();
     error BetNotPending();
     error TransferFailed();
 
     modifier onlyExistingGame(uint256 _gameId) {
-        if (games[_gameId].state == GameState(0)) revert InvalidGameId();
+        if (games[_gameId].id != _gameId) revert InvalidGameId();
         _;
     }
 
@@ -60,7 +59,7 @@ contract IntelliCasinoBetting is Ownable {
     }
 
     function createGame(uint256 _gameId) external onlyOwner {
-        if (games[_gameId].state != GameState(0)) revert GameAlreadyExists();
+        if (games[_gameId].id == _gameId) revert GameAlreadyExists();
         
         Game storage newGame = games[_gameId];
         newGame.id = _gameId;
@@ -90,7 +89,7 @@ contract IntelliCasinoBetting is Ownable {
             
             game.bettors.push(msg.sender);
         }
-
+        
         if (_bettingOnPlayer) {
             game.playerBetsTotal += msg.value;
         } else {
@@ -105,7 +104,7 @@ contract IntelliCasinoBetting is Ownable {
     function withdrawBet(uint256 _gameId) external onlyExistingGame(_gameId) {
         Game storage game = games[_gameId];
         if (game.state != GameState.OPEN) revert GameNotOpen();
-
+        
         uint256 betIndex = findBetIndex(game.bettors, msg.sender);
         if (betIndex == type(uint256).max) revert BetDoesNotExist();
         
@@ -113,6 +112,7 @@ contract IntelliCasinoBetting is Ownable {
         if (bet.state != BetState.PENDING) revert BetNotPending();
 
         uint256 betAmount = bet.amount;
+        address payable betUser = bet.user;
         if (bet.bettingOnPlayer) {
             game.playerBetsTotal -= betAmount;
         } else {
@@ -128,11 +128,11 @@ contract IntelliCasinoBetting is Ownable {
         }
         game.bettors.pop();
         delete game.bets[lastIndex];
-
-        bool sent = bet.user.send(betAmount);
+        
+        emit BetWithdrawn(_gameId, msg.sender, betAmount);
+        bool sent = betUser.send(betAmount);
         if (!sent) revert TransferFailed();
 
-        emit BetWithdrawn(_gameId, msg.sender, betAmount);
     }
 
     function closeGame(uint256 _gameId) external onlyOwner onlyExistingGame(_gameId) {
@@ -146,31 +146,27 @@ contract IntelliCasinoBetting is Ownable {
     function distributeWinnings(uint256 _gameId, bool playerWon) external onlyOwner onlyExistingGame(_gameId) {
         Game storage game = games[_gameId];
         if (game.state != GameState.CLOSED) revert GameNotClosed();
-        if (game.state == GameState.FINISHED) revert GameAlreadyFinished();
 
         game.state = GameState.FINISHED;
 
         uint256 commission = (game.totalBetPool * 3) / 100; // 3% commission
         uint256 totalWinnings = game.totalBetPool - commission;
 
-        uint256 effectiveCasinoBetsTotal = (game.casinoBetsTotal * totalWinnings) / game.totalBetPool;
-        uint256 effectivePlayerBetsTotal = (game.playerBetsTotal * totalWinnings) / game.totalBetPool;
-
         uint256 payoutRatio = 0;
         if (playerWon) {
-            payoutRatio = (effectiveCasinoBetsTotal * 10000) / effectivePlayerBetsTotal;
+            payoutRatio = (game.casinoBetsTotal * 10000) / game.playerBetsTotal;
         } else {
-            payoutRatio = (effectivePlayerBetsTotal * 10000) / effectiveCasinoBetsTotal;
+            payoutRatio = (game.playerBetsTotal * 10000) / game.casinoBetsTotal;
         }
-
+        
 
         // Transfer the commission to the owner of the contract
+        uint256 totalWinners = distributeToWinners(game, playerWon, payoutRatio);
+        emit WinningsDistributed(_gameId, totalWinnings, totalWinners);
+
         bool sent = payable(owner()).send(commission);
         if (!sent) revert TransferFailed();
 
-        uint256 totalWinners = distributeToWinners(game, playerWon, payoutRatio);
-
-        emit WinningsDistributed(_gameId, totalWinnings, totalWinners);
     }
 
     function distributeToWinners(Game storage game, bool playerWon, uint256 payoutRatio) internal returns (uint256 totalWinners) {
@@ -178,6 +174,7 @@ contract IntelliCasinoBetting is Ownable {
             Bet storage bet = game.bets[i];
             if (playerWon == bet.bettingOnPlayer) {
                 uint256 winnings = (bet.amount * (10000 + payoutRatio)) / 10000;
+                winnings = winnings - ((winnings * 3) / 100);
                 bool sent = bet.user.send(winnings);
                 if (!sent) revert TransferFailed();
                 bet.state = BetState.WON;
