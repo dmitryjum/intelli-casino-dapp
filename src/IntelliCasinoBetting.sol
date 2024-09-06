@@ -154,23 +154,21 @@ contract IntelliCasinoBetting is Ownable {
         uint256 commission = (game.totalBetPool * 3) / 100; // 3% commission
         uint256 totalWinnings = game.totalBetPool - commission;
 
-        uint256 effectiveCasinoBetsTotal = (game.casinoBetsTotal * totalWinnings) / game.totalBetPool;
-        uint256 effectivePlayerBetsTotal = (game.playerBetsTotal * totalWinnings) / game.totalBetPool;
-
         uint256 payoutRatio = 0;
         if (playerWon) {
-            payoutRatio = (effectiveCasinoBetsTotal * 10000) / effectivePlayerBetsTotal;
+            payoutRatio = (game.casinoBetsTotal * 10000) / game.playerBetsTotal;
         } else {
-            payoutRatio = (effectivePlayerBetsTotal * 10000) / effectiveCasinoBetsTotal;
+            payoutRatio = (game.playerBetsTotal * 10000) / game.casinoBetsTotal;
         }
-
+        
 
         // Transfer the commission to the owner of the contract
         uint256 totalWinners = distributeToWinners(game, playerWon, payoutRatio);
         emit WinningsDistributed(_gameId, totalWinnings, totalWinners);
-
+        
         bool sent = payable(owner()).send(commission);
         if (!sent) revert TransferFailed();
+
     }
 
     function distributeToWinners(Game storage game, bool playerWon, uint256 payoutRatio) internal returns (uint256 totalWinners) {
@@ -178,6 +176,7 @@ contract IntelliCasinoBetting is Ownable {
             Bet storage bet = game.bets[i];
             if (playerWon == bet.bettingOnPlayer) {
                 uint256 winnings = (bet.amount * (10000 + payoutRatio)) / 10000;
+                winnings = winnings - ((winnings * 3) / 100);
                 bool sent = bet.user.send(winnings);
                 if (!sent) revert TransferFailed();
                 bet.state = BetState.WON;

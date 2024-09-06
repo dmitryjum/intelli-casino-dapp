@@ -194,15 +194,15 @@ contract DistributeWinningsTest is IntelliCasinoBettingTest {
         closeGame(gameId);
     }
 
-    // function test_distributeWinnings() public {
-    //     vm.expectEmit(true, true, true, true);
-    //     emit WinningsDistributed(gameId, 1.94 ether, 1);
+    function test_distributeWinnings() public {
+        vm.expectEmit(true, true, true, true);
+        emit WinningsDistributed(gameId, 1.94 ether, 1);
 
-    //     distributeWinnings(gameId, true);
+        distributeWinnings(gameId, true);
 
-    //     (, IntelliCasinoBetting.GameState state,,,) = betting.games(gameId);
-    //     assertEq(uint(state), uint(IntelliCasinoBetting.GameState.FINISHED));
-    // }
+        (, IntelliCasinoBetting.GameState state,,,) = betting.games(gameId);
+        assertEq(uint(state), uint(IntelliCasinoBetting.GameState.FINISHED));
+    }
 
     function test_distributeWinningsGameNotClosed() public {
         createGame(2);
