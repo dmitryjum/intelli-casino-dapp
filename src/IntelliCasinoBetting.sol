@@ -37,7 +37,6 @@ contract IntelliCasinoBetting is Ownable {
     error GameAlreadyExists();
     error GameNotOpen();
     error GameNotClosed();
-    error GameAlreadyFinished();
     error NotEnoughBetAmount();
     error BetDoesNotExist();
     error BetNotPending();
@@ -147,7 +146,6 @@ contract IntelliCasinoBetting is Ownable {
     function distributeWinnings(uint256 _gameId, bool playerWon) external onlyOwner onlyExistingGame(_gameId) {
         Game storage game = games[_gameId];
         if (game.state != GameState.CLOSED) revert GameNotClosed();
-        if (game.state == GameState.FINISHED) revert GameAlreadyFinished();
 
         game.state = GameState.FINISHED;
 
@@ -165,7 +163,7 @@ contract IntelliCasinoBetting is Ownable {
         // Transfer the commission to the owner of the contract
         uint256 totalWinners = distributeToWinners(game, playerWon, payoutRatio);
         emit WinningsDistributed(_gameId, totalWinnings, totalWinners);
-        
+
         bool sent = payable(owner()).send(commission);
         if (!sent) revert TransferFailed();
 

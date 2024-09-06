@@ -210,16 +210,9 @@ contract DistributeWinningsTest is IntelliCasinoBettingTest {
         distributeWinnings(2, true);
     }
 
-    // function test_distributeWinningsAlreadyFinished() public {
-    //     distributeWinnings(gameId, true);
-    //     vm.expectRevert(IntelliCasinoBetting.GameAlreadyFinished.selector);
-    //     distributeWinnings(gameId, true);
-    // }
-
-    // function test_distributeWinningsFailedTransfer() public {
-    //     vm.prank(address(3));
-    //     vm.deal(address(betting), 1 ether - 1); // Deal less Ether than needed
-    //     vm.expectRevert(IntelliCasinoBetting.TransferFailed.selector);
-    //     distributeWinnings(gameId, true);
-    // }
+    function test_distributeWinningsFailedTransfer() public {
+        vm.deal(address(betting), betAmount - 1); // Deal less Ether than needed
+        vm.expectRevert(IntelliCasinoBetting.TransferFailed.selector);
+        distributeWinnings(gameId, true);
+    }
 }
