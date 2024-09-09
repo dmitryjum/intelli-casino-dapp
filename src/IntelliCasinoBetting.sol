@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
-import "./Ownable.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 // import "forge-std/console.sol";
 contract IntelliCasinoBetting is Ownable {
 
@@ -47,7 +47,7 @@ contract IntelliCasinoBetting is Ownable {
         _;
     }
 
-    constructor() {}
+    constructor(address _owner) Ownable(_owner) {}
 
     function findBetIndex(address[] storage bettors, address bettor) internal view returns (uint256) {
         for (uint256 i = 0; i < bettors.length; i++) {
