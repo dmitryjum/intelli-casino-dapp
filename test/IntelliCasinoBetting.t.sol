@@ -15,7 +15,7 @@ contract IntelliCasinoBettingTest is Test {
     uint256 betAmount = 1 ether;
 
     function setUp() public virtual {
-        betting = new IntelliCasinoBetting();
+        betting = new IntelliCasinoBetting(owner);
     }
 
     function createGame(uint256 _gameId) internal {
@@ -178,6 +178,12 @@ contract CloseGameTest is IntelliCasinoBettingTest {
     function test_closeGameInvalidId() public {
         vm.expectRevert(IntelliCasinoBetting.InvalidGameId.selector);
         closeGame(99);
+    }
+
+    function test_closeGameNotOwner() public {
+        vm.prank(address(99)); // Simulate a call from an unauthorized address
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", address(99)));
+        closeGame(gameId); // Non-owner should not be able to close the game
     }
 }
 
